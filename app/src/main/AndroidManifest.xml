@@ -11,7 +11,9 @@
         android:label="SmartTrip"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:hardwareAccelerated="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.SmartTrip">
         <activity
             android:name=".MainActivity"
             android:exported="true">
