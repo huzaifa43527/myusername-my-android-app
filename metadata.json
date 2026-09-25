@@ -1,0 +1,8 @@
+{
+  "name": "SmartTrip",
+  "description": "Modern navigation, real-time trip tracking, fuel logging, and vehicle maintenance management.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
