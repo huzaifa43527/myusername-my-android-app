@@ -18,11 +18,11 @@ export const BottomNav: React.FC = () => {
     <nav
       aria-label="Primary Navigation"
       style={{
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 6px)',
       }}
-      className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 transition-colors"
+      className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 transition-colors shadow-lg"
     >
-      <div className="max-w-xl mx-auto grid grid-cols-6 h-16 px-1">
+      <div className="max-w-xl mx-auto grid grid-cols-6 h-15 px-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -31,7 +31,7 @@ export const BottomNav: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-col items-center justify-center min-h-[44px] py-1 select-none relative transition-colors ${
+              className={`flex flex-col items-center justify-center min-h-[44px] py-1 select-none relative transition-colors cursor-pointer ${
                 isActive
                   ? 'text-cyan-500 dark:text-cyan-400 font-semibold'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
@@ -42,12 +42,12 @@ export const BottomNav: React.FC = () => {
                 <span className="absolute top-0 w-8 h-0.5 rounded-full bg-cyan-500 shadow-sm shadow-cyan-500/50" />
               )}
               <div className="relative">
-                <Icon size={20} className={isActive ? 'stroke-[2.3]' : 'stroke-[1.8]'} />
+                <Icon size={19} className={isActive ? 'stroke-[2.2]' : 'stroke-[1.7]'} />
                 {tab.id === 'trips' && isTripActive && (
                   <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
                 )}
               </div>
-              <span className="text-[11px] tracking-tight mt-1 truncate max-w-full px-1">
+              <span className="text-[10px] tracking-tight mt-0.5 truncate max-w-full px-0.5 font-medium">
                 {tab.label}
               </span>
             </button>

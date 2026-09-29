@@ -1,7 +1,9 @@
 package com.smarttrip.app
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.View
 import android.webkit.GeolocationPermissions
 import android.webkit.WebChromeClient
@@ -16,10 +18,20 @@ import androidx.appcompat.app.AppCompatActivity
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
+    private var wakeLock: PowerManager.WakeLock? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Acquire WakeLock so CPU doesn't sleep and kill GPS tracking when user turns screen off
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SmartTrip::BackgroundGpsWakeLock")
+            wakeLock?.acquire(24 * 60 * 60 * 1000L) // 24 hours max safeguard
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         webView = WebView(this).apply {
             id = View.generateViewId()
@@ -36,13 +48,14 @@ class MainActivity : AppCompatActivity() {
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = true
         settings.setSupportZoom(false)
+        settings.mediaPlaybackRequiresUserGesture = false
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String?,
                 callback: GeolocationPermissions.Callback?
             ) {
-                callback?.invoke(origin, true, false)
+                callback?.invoke(origin, true, true)
             }
         }
 
@@ -82,13 +95,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        if (::webView.isInitialized) {
-            webView.onPause()
-        }
+        // DO NOT call webView.onPause() here! Calling webView.onPause() explicitly disables timers,
+        // Web Geolocation, and freezes JavaScript execution as soon as the user turns off the screen.
+        // Keeping it running allows background GPS trip logging to continue seamlessly with screen OFF.
         super.onPause()
     }
 
     override fun onDestroy() {
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+            }
+        }
         if (::webView.isInitialized) {
             webView.destroy()
         }

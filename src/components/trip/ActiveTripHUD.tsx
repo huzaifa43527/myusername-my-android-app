@@ -174,20 +174,19 @@ export const ActiveTripHUD: React.FC = () => {
   return (
     <div
       style={{
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        paddingTop: 'max(env(safe-area-inset-top, 0px), 0px)',
       }}
       className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white select-none overflow-hidden"
     >
       {/* Top Bar: Vehicle, GPS Status, Safety Notice */}
-      <div className="px-4 pt-3 pb-2 bg-gradient-to-b from-slate-900 via-slate-900/90 to-transparent flex items-center justify-between">
+      <div className="shrink-0 px-4 pt-3 pb-2 bg-gradient-to-b from-slate-900 via-slate-900/90 to-transparent flex items-center justify-between border-b border-slate-800/40">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-sm shadow-cyan-400" />
           <span className="text-sm font-semibold tracking-wide text-slate-200">
             {activeVehicle ? activeVehicle.name : 'Personal Trip'}
           </span>
           {activeVehicle?.licensePlate && (
-            <span className="text-xs text-slate-400 font-mono">
+            <span className="text-xs text-slate-400 font-mono hidden sm:inline">
               {activeVehicle.licensePlate}
             </span>
           )}
@@ -224,11 +223,11 @@ export const ActiveTripHUD: React.FC = () => {
           {isSimulation ? (
             <button
               onClick={toggleSimulation}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
               title="Click to switch between Simulator and real GPS"
             >
               <Radio size={13} className="animate-pulse" />
-              <span>Simulated Drive</span>
+              <span>Simulated</span>
             </button>
           ) : (
             <div
@@ -243,42 +242,51 @@ export const ActiveTripHUD: React.FC = () => {
               <Compass size={13} />
               <span>
                 {gpsSignal === 'strong'
-                  ? 'GPS High Accuracy'
+                  ? 'GPS Active'
                   : gpsSignal === 'moderate'
-                  ? 'GPS Standard'
-                  : 'Searching GPS...'}
+                  ? 'GPS Fair'
+                  : 'Searching...'}
               </span>
             </div>
           )}
         </div>
       </div>
 
+      {/* Screen Off / Background GPS Information Banner */}
+      <div className="shrink-0 px-4 py-1.5 bg-emerald-950/40 border-b border-emerald-500/20 flex items-center justify-between text-[11px] text-emerald-300">
+        <div className="flex items-center gap-1.5">
+          <ShieldCheck size={13} className="text-emerald-400 shrink-0" />
+          <span>Background GPS Ready · Screen off tracking supported</span>
+        </div>
+        <span className="font-mono text-[10px] text-emerald-400/80 uppercase">Always-On</span>
+      </div>
+
       {/* Low Battery Warning Notification (< 20% & Not Charging) */}
       {isLowBattery && !isBatteryDismissed && (
-        <div className="mx-4 mt-2 px-3.5 py-3 rounded-2xl bg-gradient-to-r from-rose-950/95 via-red-950/95 to-amber-950/95 border-2 border-rose-500/80 text-rose-100 shadow-xl shadow-rose-950/60 flex items-center justify-between gap-3 animate-pulse">
+        <div className="shrink-0 mx-4 mt-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-rose-950/95 via-red-950/95 to-amber-950/95 border border-rose-500/80 text-rose-100 shadow-xl shadow-rose-950/60 flex items-center justify-between gap-3 animate-pulse">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2 rounded-xl bg-rose-500/25 text-rose-400 shrink-0 ring-2 ring-rose-500/30">
-              <BatteryWarning size={22} className="animate-bounce" />
+            <div className="p-1.5 rounded-lg bg-rose-500/25 text-rose-400 shrink-0">
+              <BatteryWarning size={20} className="animate-bounce" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-rose-200 tracking-wide uppercase flex items-center gap-1.5">
-                  <BellRing size={13} className="text-rose-400 animate-pulse" />
+                  <BellRing size={12} className="text-rose-400" />
                   Battery Critical ({batteryPct}%)
                 </span>
                 <span className="flex items-center gap-1 text-[10px] text-amber-300 font-bold bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/40 uppercase tracking-wider">
-                  <Zap size={10} className="fill-amber-300" />
-                  Plug In Charger
+                  <Zap size={9} className="fill-amber-300" />
+                  Plug Charger
                 </span>
               </div>
-              <p className="text-xs text-rose-100/90 mt-0.5 leading-snug">
-                Battery dropped below 20%. Please connect your car charger to avoid GPS interruption.
+              <p className="text-[11px] text-rose-100/90 mt-0.5 leading-snug">
+                Battery dropped below 20%. Please connect your car charger.
               </p>
             </div>
           </div>
           <button
             onClick={() => setIsBatteryDismissed(true)}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 shrink-0 transition-colors cursor-pointer"
+            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 shrink-0 transition-colors cursor-pointer"
             title="Dismiss warning"
             aria-label="Dismiss warning"
           >
@@ -287,46 +295,38 @@ export const ActiveTripHUD: React.FC = () => {
         </div>
       )}
 
-      {/* Safety Banner (encourages eyes on the road) */}
-      {settings.safetyMode && (
-        <div className="mx-4 my-1 px-3 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center justify-center gap-2 text-slate-300 text-xs text-center">
-          <ShieldCheck size={14} className="text-cyan-400 shrink-0" />
-          <span>Drive safely · Avoid interacting with your phone while driving</span>
-        </div>
-      )}
-
       {/* Weak GPS warning */}
       {gpsSignal === 'weak' && !isSimulation && (
-        <div className="mx-4 mt-1 px-3 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs flex items-center gap-2">
-          <AlertTriangle size={16} className="text-amber-400 shrink-0" />
-          <span>GPS signal is weak. Please ensure a clearer view of the sky.</span>
+        <div className="shrink-0 mx-4 mt-1 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs flex items-center gap-2">
+          <AlertTriangle size={15} className="text-amber-400 shrink-0" />
+          <span className="text-[11px]">GPS signal weak. Need clearer sky view.</span>
           <button
             onClick={toggleSimulation}
-            className="ml-auto underline font-medium text-cyan-300 shrink-0"
+            className="ml-auto underline font-medium text-cyan-300 shrink-0 text-xs"
           >
             Use Simulator
           </button>
         </div>
       )}
 
-      {/* Main Glanceable HUD: Big Speedometer, Distance, Trip Time */}
-      <div className="flex-1 flex flex-col justify-center px-4 max-w-md mx-auto w-full">
+      {/* Main Glanceable HUD (Scrollable middle container so bottom controls never get cut off) */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-2 flex flex-col justify-between max-w-md mx-auto w-full space-y-2">
         {/* Speed Section: Prominent, Big, Highly Readable */}
-        <div className="text-center my-3 relative">
+        <div className="text-center py-1 relative shrink-0">
           <div className="flex items-baseline justify-center">
-            <span className="font-extrabold text-7xl sm:text-8xl tracking-tight text-white font-mono tabular-nums leading-none">
+            <span className="font-extrabold text-6xl sm:text-7xl tracking-tight text-white font-mono tabular-nums leading-none">
               {currentSpeedKmh}
             </span>
-            <span className="text-xl sm:text-2xl font-semibold text-cyan-400 ml-2">
+            <span className="text-lg sm:text-xl font-semibold text-cyan-400 ml-2">
               {settings.unitDistance === 'mi' ? 'mph' : 'km/h'}
             </span>
           </div>
-          <p className="text-xs uppercase tracking-widest text-slate-400 font-semibold mt-1">
+          <p className="text-[11px] uppercase tracking-widest text-slate-400 font-semibold mt-1">
             Current Speed
           </p>
 
           {isTripPaused && (
-            <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/40">
+            <div className="inline-flex items-center gap-1.5 mt-1.5 px-3 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/40">
               <Pause size={12} />
               <span>TRIP PAUSED</span>
             </div>
@@ -334,46 +334,46 @@ export const ActiveTripHUD: React.FC = () => {
         </div>
 
         {/* 3-Column Metrics: Distance, Trip Time, Top Speed */}
-        <div className="grid grid-cols-3 gap-2 my-2">
+        <div className="grid grid-cols-3 gap-2 shrink-0">
           {/* Distance */}
-          <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800/80 text-center">
-            <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-white tracking-tight">
+          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 text-center">
+            <div className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-white tracking-tight">
               {currentDistanceKm.toFixed(1)}
-              <span className="text-xs font-semibold text-slate-400 ml-1">
+              <span className="text-[10px] font-semibold text-slate-400 ml-1">
                 {settings.unitDistance}
               </span>
             </div>
-            <span className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider block mt-0.5">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mt-0.5">
               Distance
             </span>
           </div>
 
           {/* Trip Time */}
-          <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800/80 text-center">
-            <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-white tracking-tight">
+          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 text-center">
+            <div className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-white tracking-tight">
               {formatDigitalTimer(currentDurationSeconds)}
             </div>
-            <span className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider block mt-0.5">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mt-0.5">
               Trip Time
             </span>
           </div>
 
           {/* Top Speed */}
-          <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800/80 text-center">
-            <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-amber-400 tracking-tight">
+          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 text-center">
+            <div className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-amber-400 tracking-tight">
               {maxSpeedKmh}
-              <span className="text-xs font-semibold text-slate-400 ml-1">
+              <span className="text-[10px] font-semibold text-slate-400 ml-1">
                 {settings.unitDistance === 'mi' ? 'mph' : 'km/h'}
               </span>
             </div>
-            <span className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider block mt-0.5">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mt-0.5">
               Top Speed
             </span>
           </div>
         </div>
 
-        {/* Live Route Map (Compact preview underneath as per spec #8) */}
-        <div className="relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-inner my-2 flex-1 min-h-[160px] max-h-[260px]">
+        {/* Live Route Map (Flexible height that adapts cleanly) */}
+        <div className="relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-inner flex-1 min-h-[140px] max-h-[220px]">
           <TripMap
             points={currentPoints}
             currentPoint={currentPoint}
@@ -389,24 +389,29 @@ export const ActiveTripHUD: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Large Touch Controls (Spec #8 & #10: PAUSE / RESUME, END TRIP) */}
-      <div className="p-4 bg-slate-900/95 border-t border-slate-800/80 max-w-md mx-auto w-full">
+      {/* Bottom Touch Controls: ALWAYS pinned, never cut off, with Android safe area padding */}
+      <div
+        style={{
+          paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 14px)',
+        }}
+        className="shrink-0 p-3 pt-2 bg-slate-900/95 border-t border-slate-800 max-w-md mx-auto w-full"
+      >
         <div className="grid grid-cols-2 gap-3">
           {/* Pause / Resume Button */}
           {isTripPaused ? (
             <button
               onClick={resumeTrip}
-              className="min-h-[56px] px-6 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-base flex items-center justify-center gap-2.5 shadow-lg shadow-cyan-900/30 active:scale-[0.98] transition-all"
+              className="min-h-[50px] px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-900/30 active:scale-[0.98] transition-all cursor-pointer"
             >
-              <Play size={22} className="fill-white" />
+              <Play size={18} className="fill-white" />
               <span>RESUME</span>
             </button>
           ) : (
             <button
               onClick={pauseTrip}
-              className="min-h-[56px] px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold text-base flex items-center justify-center gap-2.5 border border-slate-700 active:scale-[0.98] transition-all"
+              className="min-h-[50px] px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold text-sm flex items-center justify-center gap-2 border border-slate-700 active:scale-[0.98] transition-all cursor-pointer"
             >
-              <Pause size={22} />
+              <Pause size={18} />
               <span>PAUSE</span>
             </button>
           )}
@@ -414,9 +419,9 @@ export const ActiveTripHUD: React.FC = () => {
           {/* End Trip Button */}
           <button
             onClick={() => setShowEndConfirm(true)}
-            className="min-h-[56px] px-6 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-base flex items-center justify-center gap-2.5 shadow-lg shadow-rose-950/40 active:scale-[0.98] transition-all"
+            className="min-h-[50px] px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-950/40 active:scale-[0.98] transition-all cursor-pointer"
           >
-            <Square size={20} className="fill-white" />
+            <Square size={18} className="fill-white" />
             <span>END TRIP</span>
           </button>
         </div>
