@@ -37,6 +37,7 @@ export const MoreView: React.FC = () => {
     exportData,
     importData,
     resetToDefaults,
+    clearAllData,
   } = useTrip();
 
   const [activeSection, setActiveSection] = useState<'stats' | 'places' | 'settings'>('stats');
@@ -493,19 +494,20 @@ export const MoreView: React.FC = () => {
               </label>
             </div>
 
-            {/* Reset to realistic demo data */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <span className="text-xs text-slate-500">Need to reload sample records?</span>
+            {/* Reset / Clear Data Options */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <button
                 onClick={() => {
-                  if (confirm('Reset application to initial sample data?')) {
-                    resetToDefaults();
+                  if (confirm('Are you sure you want to clear all data? This will remove all vehicles, trips, fuel records, and maintenance logs.')) {
+                    clearAllData();
+                    setBackupSuccessMessage('All data cleared successfully. Fresh start!');
+                    setTimeout(() => setBackupSuccessMessage(''), 4000);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 transition-colors cursor-pointer"
               >
-                <RefreshCw size={14} />
-                <span>Reset Demo Data</span>
+                <Trash2 size={14} />
+                <span>Clear All Data & Vehicles</span>
               </button>
             </div>
           </div>

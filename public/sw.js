@@ -65,3 +65,13 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// Keep-alive heartbeat message listener for background trip tracking
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'KEEP_ALIVE_GPS') {
+    // Respond to keep service worker active during screen-off / navigation
+    if (event.ports && event.ports[0]) {
+      event.ports[0].postMessage({ status: 'alive', time: Date.now() });
+    }
+  }
+});

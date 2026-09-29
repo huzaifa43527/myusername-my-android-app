@@ -11,6 +11,7 @@ import { DashboardView } from './components/views/DashboardView';
 import { TripHistoryView } from './components/views/TripHistoryView';
 import { FuelLogView } from './components/views/FuelLogView';
 import { VehicleView } from './components/views/VehicleView';
+import { GoogleMapsView } from './components/views/GoogleMapsView';
 import { MoreView } from './components/views/MoreView';
 import { ActiveTripHUD } from './components/trip/ActiveTripHUD';
 import { TripSummaryModal } from './components/trip/TripSummaryModal';
@@ -36,7 +37,13 @@ const AppContent: React.FC = () => {
   } = useTrip();
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-white">
+    <div
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+      className="min-h-dvh h-dvh overflow-y-auto bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-white"
+    >
       {/* Top Header */}
       <Header />
 
@@ -44,6 +51,7 @@ const AppContent: React.FC = () => {
       <main className="flex-1 w-full">
         {activeTab === 'home' && <DashboardView />}
         {activeTab === 'trips' && <TripHistoryView />}
+        {activeTab === 'maps' && <GoogleMapsView />}
         {activeTab === 'fuel' && <FuelLogView />}
         {activeTab === 'vehicle' && <VehicleView />}
         {activeTab === 'more' && <MoreView />}

@@ -17,21 +17,23 @@ export const LocationPermissionModal: React.FC = () => {
     updateSettings({ hasAskedLocationPermission: true });
     setShowLocationPermissionModal(false);
 
+    const vehicleId = activeVehicle?.id || '';
+
     // Prompt system geolocation permission
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         () => {
           // Permission granted, start real GPS trip
-          startTrip(activeVehicle.id, 'Commute', false);
+          startTrip(vehicleId, 'Commute', false);
         },
         () => {
-          // If denied, fallback smoothly to simulation
-          startTrip(activeVehicle.id, 'Commute', true);
+          // If denied, still attempt real GPS tracking
+          startTrip(vehicleId, 'Commute', false);
         },
         { enableHighAccuracy: true }
       );
     } else {
-      startTrip(activeVehicle.id, 'Commute', true);
+      startTrip(vehicleId, 'Commute', false);
     }
   };
 

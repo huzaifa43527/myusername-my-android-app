@@ -63,9 +63,9 @@ export const DashboardView: React.FC = () => {
   const insights = generateSmartInsights(trips, settings.currency);
 
   // Active Vehicle Maintenance check
-  const activeMaint = maintenanceItems.filter((m) => m.vehicleId === activeVehicle.id);
+  const activeMaint = activeVehicle ? maintenanceItems.filter((m) => m.vehicleId === activeVehicle.id) : [];
   const nextDueMaint = activeMaint.sort((a, b) => a.nextServiceKm - b.nextServiceKm)[0];
-  const maintStatus = nextDueMaint ? getMaintenanceStatus(nextDueMaint, activeVehicle) : null;
+  const maintStatus = nextDueMaint && activeVehicle ? getMaintenanceStatus(nextDueMaint, activeVehicle) : null;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6 pb-24">
@@ -81,15 +81,25 @@ export const DashboardView: React.FC = () => {
         </div>
 
         {/* Vehicle chip indicator */}
-        <div className="inline-flex items-center gap-2 self-start sm:self-auto px-3.5 py-1.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <div className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
-          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-            {activeVehicle.name}
-          </span>
-          <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-            {activeVehicle.odometerKm.toLocaleString()} {settings.unitDistance}
-          </span>
-        </div>
+        {activeVehicle ? (
+          <div className="inline-flex items-center gap-2 self-start sm:self-auto px-3.5 py-1.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+            <div className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
+            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+              {activeVehicle.name}
+            </span>
+            <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+              {activeVehicle.odometerKm.toLocaleString()} {settings.unitDistance}
+            </span>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowAddVehicleModal(true)}
+            className="inline-flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-1.5 rounded-2xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/50 text-cyan-600 dark:text-cyan-400 text-xs font-semibold shadow-xs hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors cursor-pointer"
+          >
+            <Plus size={14} />
+            <span>Add Vehicle</span>
+          </button>
+        )}
       </div>
 
       {/* 2. Prominent Primary Action: START TRIP */}
@@ -109,23 +119,21 @@ export const DashboardView: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div className="flex flex-col items-center sm:items-end gap-2 w-full sm:w-auto">
               <button
-                onClick={() => startTrip(activeVehicle.id, selectedCategory, false)}
-                className="min-h-[58px] px-8 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-lg flex items-center justify-center gap-3 shadow-lg shadow-cyan-500/25 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
+                onClick={() => {
+                  if (activeVehicle) {
+                    startTrip(activeVehicle.id, selectedCategory, false);
+                  } else {
+                    setShowAddVehicleModal(true);
+                  }
+                }}
+                className="w-full sm:w-auto min-h-[58px] px-10 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-lg flex items-center justify-center gap-3 shadow-lg shadow-cyan-500/25 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
               >
                 <Play size={24} className="fill-slate-950" />
-                <span>START TRIP</span>
+                <span>START LIVE TRIP</span>
               </button>
-
-              <button
-                onClick={() => startTrip(activeVehicle.id, selectedCategory, true)}
-                className="min-h-[46px] sm:min-h-[58px] px-4 rounded-2xl bg-white/10 hover:bg-white/15 text-cyan-200 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 border border-white/15 active:scale-98 transition-all cursor-pointer"
-                title="Launch with realistic driving simulation (ideal for desktop testing)"
-              >
-                <Radio size={16} />
-                <span>Simulate Drive</span>
-              </button>
+              <span className="text-[11px] text-cyan-300 font-medium">Real GPS Tracker (No Demo)</span>
             </div>
           </div>
 
@@ -152,8 +160,14 @@ export const DashboardView: React.FC = () => {
       {/* 3. Quick Actions Grid (Spec #29) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <button
-          onClick={() => startTrip(activeVehicle.id, selectedCategory, false)}
-          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left hover:border-cyan-500/50 hover:shadow-md transition-all group"
+          onClick={() => {
+            if (activeVehicle) {
+              startTrip(activeVehicle.id, selectedCategory, false);
+            } else {
+              setShowAddVehicleModal(true);
+            }
+          }}
+          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left hover:border-cyan-500/50 hover:shadow-md transition-all group cursor-pointer"
         >
           <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform">
             <Play size={20} className="fill-current" />
@@ -174,19 +188,19 @@ export const DashboardView: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('trips')}
-          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left hover:border-cyan-500/50 hover:shadow-md transition-all group"
+          onClick={() => setActiveTab('maps')}
+          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left hover:border-cyan-500/50 hover:shadow-md transition-all group cursor-pointer"
         >
           <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform">
-            <Compass size={20} />
+            <MapPin size={20} />
           </div>
-          <span className="font-semibold text-sm text-slate-900 dark:text-white block">View Trips</span>
-          <span className="text-xs text-slate-500 dark:text-slate-400">History & routes</span>
+          <span className="font-semibold text-sm text-slate-900 dark:text-white block">Google Maps</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">Fuel & mechanics</span>
         </button>
 
         <button
           onClick={() => setShowAddVehicleModal(true)}
-          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left hover:border-cyan-500/50 hover:shadow-md transition-all group"
+          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left hover:border-cyan-500/50 hover:shadow-md transition-all group cursor-pointer"
         >
           <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform">
             <Car size={20} />
@@ -194,6 +208,35 @@ export const DashboardView: React.FC = () => {
           <span className="font-semibold text-sm text-slate-900 dark:text-white block">Add Vehicle</span>
           <span className="text-xs text-slate-500 dark:text-slate-400">Manage garage</span>
         </button>
+      </div>
+
+      {/* Google Maps Live Grounding Banner */}
+      <div
+        onClick={() => setActiveTab('maps')}
+        className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-cyan-600/10 via-blue-600/10 to-transparent border border-cyan-500/30 flex items-center justify-between gap-4 cursor-pointer hover:border-cyan-500/60 hover:shadow-md transition-all group"
+      >
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-cyan-500 text-slate-950 flex items-center justify-center shrink-0 shadow-md shadow-cyan-500/20 group-hover:scale-105 transition-transform">
+            <MapPin size={24} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
+                Google Maps Live Assistant
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 px-2 py-0.5 rounded-full">
+                Live Data
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Find verified nearby petrol pumps, tire puncture shops, workshops, and check live travel routes.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-xs font-bold text-cyan-600 dark:text-cyan-400 shrink-0">
+          <span className="hidden sm:inline">Explore Maps</span>
+          <ChevronRight size={18} />
+        </div>
       </div>
 
       {/* 4. Today's Activity Section (Spec #7) */}
@@ -343,41 +386,55 @@ export const DashboardView: React.FC = () => {
                 <Car size={18} className="text-blue-600 dark:text-cyan-400" />
                 <span>Vehicle Status</span>
               </div>
-              <span className="text-xs text-slate-500">{activeVehicle.fuelType}</span>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 dark:text-slate-400">Current Odometer</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">
-                  {activeVehicle.odometerKm.toLocaleString()} {settings.unitDistance}
-                </span>
-              </div>
-
-              {nextDueMaint && maintStatus && (
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 mt-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                      {nextDueMaint.title}
-                    </span>
-                    <span
-                      className={`text-[11px] font-bold ${
-                        maintStatus.status === 'overdue'
-                          ? 'text-rose-500'
-                          : maintStatus.status === 'due'
-                          ? 'text-amber-500'
-                          : 'text-emerald-500'
-                      }`}
-                    >
-                      {maintStatus.label}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    Next service at {nextDueMaint.nextServiceKm.toLocaleString()} {settings.unitDistance}
-                  </div>
-                </div>
+              {activeVehicle && (
+                <span className="text-xs text-slate-500 capitalize">{activeVehicle.fuelType}</span>
               )}
             </div>
+
+            {activeVehicle ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">Current Odometer</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">
+                    {activeVehicle.odometerKm.toLocaleString()} {settings.unitDistance}
+                  </span>
+                </div>
+
+                {nextDueMaint && maintStatus && (
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 mt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        {nextDueMaint.title}
+                      </span>
+                      <span
+                        className={`text-[11px] font-bold ${
+                          maintStatus.status === 'overdue'
+                            ? 'text-rose-500'
+                            : maintStatus.status === 'due'
+                            ? 'text-amber-500'
+                            : 'text-emerald-500'
+                        }`}
+                      >
+                        {maintStatus.label}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-1">
+                      Next service at {nextDueMaint.nextServiceKm.toLocaleString()} {settings.unitDistance}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="py-4 text-center space-y-2">
+                <p className="text-xs text-slate-500 dark:text-slate-400">No vehicle added yet</p>
+                <button
+                  onClick={() => setShowAddVehicleModal(true)}
+                  className="px-3.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-cyan-400 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
+                >
+                  + Add Vehicle
+                </button>
+              </div>
+            )}
           </div>
 
           <button

@@ -9,6 +9,7 @@ export const Header: React.FC = () => {
     vehicles,
     activeVehicle,
     setDefaultVehicle,
+    setShowAddVehicleModal,
     settings,
     updateSettings,
     isTripActive,
@@ -34,20 +35,30 @@ export const Header: React.FC = () => {
         {/* Zone 2: Contextual Status / Active Vehicle */}
         <div className="hidden sm:flex items-center gap-2">
           {/* Vehicle selector */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300">
-            <Car size={15} className="text-cyan-500" />
-            <select
-              value={activeVehicle.id}
-              onChange={(e) => setDefaultVehicle(e.target.value)}
-              className="bg-transparent border-none outline-none cursor-pointer font-medium text-slate-800 dark:text-slate-200 pr-1"
+          {activeVehicle ? (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300">
+              <Car size={15} className="text-cyan-500" />
+              <select
+                value={activeVehicle.id}
+                onChange={(e) => setDefaultVehicle(e.target.value)}
+                className="bg-transparent border-none outline-none cursor-pointer font-medium text-slate-800 dark:text-slate-200 pr-1"
+              >
+                {vehicles.map((v) => (
+                  <option key={v.id} value={v.id} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                    {v.name} ({v.licensePlate})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAddVehicleModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800/50 rounded-xl text-xs font-semibold hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors cursor-pointer"
             >
-              {vehicles.map((v) => (
-                <option key={v.id} value={v.id} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
-                  {v.name} ({v.licensePlate})
-                </option>
-              ))}
-            </select>
-          </div>
+              <Car size={15} />
+              <span>+ Add Vehicle</span>
+            </button>
+          )}
 
           {/* Active Trip Indicator if running */}
           {isTripActive && (

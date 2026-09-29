@@ -17,11 +17,12 @@ export const FuelLogView: React.FC = () => {
     deleteFuelLog,
     activeVehicle,
     setShowAddFuelModal,
+    setShowAddVehicleModal,
     settings,
   } = useTrip();
 
   // Filter logs for active vehicle
-  const vehicleLogs = fuelLogs.filter((l) => l.vehicleId === activeVehicle.id);
+  const vehicleLogs = activeVehicle ? fuelLogs.filter((l) => l.vehicleId === activeVehicle.id) : [];
 
   // Calculate statistics
   const totalSpent = vehicleLogs.reduce((acc, l) => acc + l.totalAmount, 0);
@@ -29,8 +30,7 @@ export const FuelLogView: React.FC = () => {
   const avgPrice = totalVolume > 0 ? Math.round(totalSpent / totalVolume) : 0;
 
   // Calculate fuel economy between consecutive logs
-  // distance delta / fuel quantity
-  let estimatedEconomy = 14.6; // realistic baseline for Honda City 1.5
+  let estimatedEconomy: number | null = null;
   if (vehicleLogs.length >= 2) {
     const sorted = [...vehicleLogs].sort((a, b) => b.odometerKm - a.odometerKm);
     const distDelta = sorted[0].odometerKm - sorted[1].odometerKm;
@@ -48,12 +48,20 @@ export const FuelLogView: React.FC = () => {
             Fuel Log
           </h1>
           <p className="text-slate-600 dark:text-slate-400 text-sm mt-0.5">
-            Track fuel expenses, refills and fuel economy for {activeVehicle.name}
+            {activeVehicle
+              ? `Track fuel expenses, refills and fuel economy for ${activeVehicle.name}`
+              : 'Track fuel expenses, refills and fuel economy'}
           </p>
         </div>
 
         <button
-          onClick={() => setShowAddFuelModal(true)}
+          onClick={() => {
+            if (activeVehicle) {
+              setShowAddFuelModal(true);
+            } else {
+              setShowAddVehicleModal(true);
+            }
+          }}
           className="inline-flex items-center justify-center gap-2 min-h-[48px] px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-950/20 active:scale-98 transition-all cursor-pointer self-start sm:self-auto"
         >
           <Plus size={18} />
@@ -80,13 +88,19 @@ export const FuelLogView: React.FC = () => {
             Estimated Average
           </span>
           <div className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 dark:text-white tabular-nums">
-            {estimatedEconomy}{' '}
-            <span className="text-sm font-semibold text-slate-400">
-              {settings.unitDistance}/{settings.unitFuel}
-            </span>
+            {estimatedEconomy !== null ? (
+              <>
+                {estimatedEconomy}{' '}
+                <span className="text-sm font-semibold text-slate-400">
+                  {settings.unitDistance}/{settings.unitFuel}
+                </span>
+              </>
+            ) : (
+              <span className="text-2xl font-bold text-slate-400">--</span>
+            )}
           </div>
           <span className="text-xs text-slate-400 mt-1 block">
-            Optimal city & highway blend
+            {estimatedEconomy !== null ? 'Based on last 2 refills' : 'Calculated after 2 refills'}
           </span>
         </div>
 

@@ -20,6 +20,7 @@ export const TripHistoryView: React.FC = () => {
     vehicles,
     startTrip,
     activeVehicle,
+    setShowAddVehicleModal,
     setSelectedTripForDetails,
     settings,
   } = useTrip();
@@ -164,8 +165,14 @@ export const TripHistoryView: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={() => startTrip(activeVehicle.id, 'Commute', false)}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm shadow-md active:scale-98 transition-all"
+            onClick={() => {
+              if (activeVehicle) {
+                startTrip(activeVehicle.id, 'Commute', false);
+              } else {
+                setShowAddVehicleModal(true);
+              }
+            }}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm shadow-md active:scale-98 transition-all cursor-pointer"
           >
             <Play size={18} className="fill-slate-950" />
             <span>START TRIP</span>

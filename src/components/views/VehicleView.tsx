@@ -34,9 +34,9 @@ export const VehicleView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'garage' | 'maintenance'>('garage');
 
   // Active vehicle stats
-  const activeVehicleTrips = trips.filter((t) => t.vehicleId === activeVehicle.id);
-  const activeVehicleFuel = fuelLogs.filter((f) => f.vehicleId === activeVehicle.id);
-  const activeMaint = maintenanceItems.filter((m) => m.vehicleId === activeVehicle.id);
+  const activeVehicleTrips = activeVehicle ? trips.filter((t) => t.vehicleId === activeVehicle.id) : [];
+  const activeVehicleFuel = activeVehicle ? fuelLogs.filter((f) => f.vehicleId === activeVehicle.id) : [];
+  const activeMaint = activeVehicle ? maintenanceItems.filter((m) => m.vehicleId === activeVehicle.id) : [];
 
   const lastFuel = activeVehicleFuel[0];
 
@@ -101,14 +101,34 @@ export const VehicleView: React.FC = () => {
       {/* Tab 1: Garage View (Vehicle Cards as per Spec #15) */}
       {activeTab === 'garage' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {vehicles.map((v) => {
-              const isSelected = v.id === activeVehicle.id;
-              const vTrips = trips.filter((t) => t.vehicleId === v.id);
-              const vFuel = fuelLogs.filter((f) => f.vehicleId === v.id);
-              const vMaint = maintenanceItems.filter((m) => m.vehicleId === v.id);
-              const nextMaint = vMaint.sort((a, b) => a.nextServiceKm - b.nextServiceKm)[0];
-              const nextMaintEval = nextMaint ? getMaintenanceStatus(nextMaint, v) : null;
+          {vehicles.length === 0 ? (
+            <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 sm:p-12 text-center space-y-4 shadow-xs">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 flex items-center justify-center mx-auto border border-blue-100 dark:border-blue-900/40">
+                <Car size={32} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Your Garage is Empty</h3>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                  Add your car, bike, or commercial vehicle to start tracking mileage, fuel fill-ups, and scheduled maintenance.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAddVehicleModal(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
+              >
+                <Plus size={18} />
+                <span>Add Your Vehicle</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {vehicles.map((v) => {
+                const isSelected = activeVehicle ? v.id === activeVehicle.id : false;
+                const vTrips = trips.filter((t) => t.vehicleId === v.id);
+                const vFuel = fuelLogs.filter((f) => f.vehicleId === v.id);
+                const vMaint = maintenanceItems.filter((m) => m.vehicleId === v.id);
+                const nextMaint = vMaint.sort((a, b) => a.nextServiceKm - b.nextServiceKm)[0];
+                const nextMaintEval = nextMaint ? getMaintenanceStatus(nextMaint, v) : null;
 
               return (
                 <div
@@ -216,24 +236,65 @@ export const VehicleView: React.FC = () => {
               );
             })}
           </div>
+          )}
         </div>
       )}
 
       {/* Tab 2: Maintenance Screen (Cards as per Spec #18: Engine Oil, Brake Service, Tyres, Battery, etc.) */}
       {activeTab === 'maintenance' && (
         <div className="space-y-4">
-          <div className="p-4 rounded-3xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
-              <Wrench size={16} className="text-blue-600 dark:text-cyan-400" />
-              <span>
-                Tracking maintenance for <strong>{activeVehicle.name}</strong> ({activeVehicle.odometerKm.toLocaleString()} {settings.unitDistance})
-              </span>
+          {!activeVehicle ? (
+            <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 sm:p-12 text-center space-y-4 shadow-xs">
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-100 dark:border-amber-900/40">
+                <Wrench size={32} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">No Vehicle Selected</h3>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                  Add a vehicle to your garage first to track engine oil, brake inspections, tire health, and scheduled servicing.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAddVehicleModal(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm shadow-md transition-all cursor-pointer"
+              >
+                <Plus size={18} />
+                <span>Add Vehicle First</span>
+              </button>
             </div>
-          </div>
+          ) : activeMaint.length === 0 ? (
+            <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 sm:p-12 text-center space-y-4 shadow-xs">
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-100 dark:border-amber-900/40">
+                <Wrench size={32} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">No Service Items Set</h3>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                  Add routine service reminders (e.g. Engine Oil, Brake Pads, Air Filter) to receive mileage-based alerts for {activeVehicle.name}.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAddMaintenanceModal(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm shadow-md transition-all cursor-pointer"
+              >
+                <Plus size={18} />
+                <span>Add First Service Item</span>
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="p-4 rounded-3xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                  <Wrench size={16} className="text-blue-600 dark:text-cyan-400" />
+                  <span>
+                    Tracking maintenance for <strong>{activeVehicle.name}</strong> ({activeVehicle.odometerKm.toLocaleString()} {settings.unitDistance})
+                  </span>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            {activeMaint.map((item) => {
-              const evalRes = getMaintenanceStatus(item, activeVehicle);
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {activeMaint.map((item) => {
+                  const evalRes = getMaintenanceStatus(item, activeVehicle);
 
               return (
                 <div
@@ -323,6 +384,8 @@ export const VehicleView: React.FC = () => {
               );
             })}
           </div>
+            </>
+          )}
         </div>
       )}
     </div>

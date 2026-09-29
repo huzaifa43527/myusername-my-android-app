@@ -1,26 +1,28 @@
 import React from 'react';
 import { useTrip } from '../../context/TripContext';
-import { LayoutDashboard, Compass, Fuel, Car, MoreHorizontal } from 'lucide-react';
+import { LayoutDashboard, Compass, MapPin, Fuel, Car, MoreHorizontal } from 'lucide-react';
 
 export const BottomNav: React.FC = () => {
   const { activeTab, setActiveTab, isTripActive } = useTrip();
 
-  // If active trip is in progress and user is driving, active trip HUD takes center stage,
-  // but bottom nav remains visible or accessible so user can navigate if stopped.
   const tabs = [
     { id: 'home' as const, label: 'Home', icon: LayoutDashboard },
     { id: 'trips' as const, label: 'Trips', icon: Compass },
+    { id: 'maps' as const, label: 'Maps', icon: MapPin },
     { id: 'fuel' as const, label: 'Fuel', icon: Fuel },
-    { id: 'vehicle' as const, label: 'Vehicle', icon: Car },
+    { id: 'vehicle' as const, label: 'Garage', icon: Car },
     { id: 'more' as const, label: 'More', icon: MoreHorizontal },
   ];
 
   return (
     <nav
       aria-label="Primary Navigation"
+      style={{
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
       className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 transition-colors"
     >
-      <div className="max-w-lg mx-auto grid grid-cols-5 h-16 px-1">
+      <div className="max-w-xl mx-auto grid grid-cols-6 h-16 px-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;

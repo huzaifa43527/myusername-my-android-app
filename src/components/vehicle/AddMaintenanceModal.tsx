@@ -12,15 +12,50 @@ export const AddMaintenanceModal: React.FC<AddMaintenanceModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { activeVehicle, addMaintenance, settings } = useTrip();
+  const { activeVehicle, addMaintenance, settings, setShowAddVehicleModal } = useTrip();
 
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<MaintenanceCategory>('oil');
-  const [lastKm, setLastKm] = useState(activeVehicle.odometerKm.toString());
-  const [nextKm, setNextKm] = useState((activeVehicle.odometerKm + 5000).toString());
+  const [lastKm, setLastKm] = useState(activeVehicle?.odometerKm?.toString() || '0');
+  const [nextKm, setNextKm] = useState(((activeVehicle?.odometerKm || 0) + 5000).toString());
   const [notes, setNotes] = useState('');
 
   if (!isOpen) return null;
+
+  if (!activeVehicle) {
+    return (
+      <div className="fixed inset-0 z-60 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 text-center shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+            <Wrench size={24} />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-bold text-base text-slate-900 dark:text-white">Vehicle Needed</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Please add a vehicle to your garage before setting up maintenance reminders.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                onClose();
+                setShowAddVehicleModal(true);
+              }}
+              className="flex-1 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold cursor-pointer"
+            >
+              Add Vehicle
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

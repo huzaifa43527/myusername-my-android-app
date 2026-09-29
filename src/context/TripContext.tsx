@@ -21,10 +21,16 @@ import {
   calculateHaversineDistanceKm,
   findNearestLocation,
 } from '../utils/helpers';
+import { backgroundLocationKeeper } from '../utils/backgroundLocationKeeper';
+import {
+  idbGet,
+  idbSet,
+  IDB_KEYS,
+} from '../utils/indexedDBStorage';
 
 interface TripContextType {
   vehicles: Vehicle[];
-  activeVehicle: Vehicle;
+  activeVehicle: Vehicle | null;
   trips: Trip[];
   fuelLogs: FuelLog[];
   maintenanceItems: MaintenanceItem[];
@@ -35,6 +41,7 @@ interface TripContextType {
   isTripActive: boolean;
   isTripPaused: boolean;
   currentSpeedKmh: number;
+  maxSpeedKmh: number;
   currentDistanceKm: number;
   currentDurationSeconds: number;
   currentMovingSeconds: number;
@@ -45,8 +52,8 @@ interface TripContextType {
   pendingSummaryTrip: Trip | null;
 
   // Navigation & Modals
-  activeTab: 'home' | 'trips' | 'fuel' | 'vehicle' | 'more';
-  setActiveTab: (tab: 'home' | 'trips' | 'fuel' | 'vehicle' | 'more') => void;
+  activeTab: 'home' | 'trips' | 'maps' | 'fuel' | 'vehicle' | 'more';
+  setActiveTab: (tab: 'home' | 'trips' | 'maps' | 'fuel' | 'vehicle' | 'more') => void;
   showOnboarding: boolean;
   setShowOnboarding: (val: boolean) => void;
   showLocationPermissionModal: boolean;
@@ -86,6 +93,7 @@ interface TripContextType {
   exportData: () => string;
   importData: (jsonString: string) => boolean;
   resetToDefaults: () => void;
+  clearAllData: () => void;
 }
 
 const STORAGE_KEYS = {
@@ -99,52 +107,99 @@ const STORAGE_KEYS = {
 
 const TripContext = createContext<TripContextType | undefined>(undefined);
 
+// Helper checks to purge old mock/demo records completely
+const isMockVehicle = (v: Vehicle) =>
+  v.id === 'veh_honda_city' ||
+  v.id === 'veh_toyota_corolla' ||
+  v.id === 'veh_my_car' ||
+  v.name === 'Honda City' ||
+  v.name === 'Toyota Corolla';
+
+const isMockTrip = (t: Trip) =>
+  t.vehicleId === 'veh_honda_city' ||
+  t.vehicleId === 'veh_toyota_corolla' ||
+  t.id === 'trip_1' ||
+  t.id === 'trip_2' ||
+  t.id === 'trip_3' ||
+  t.id === 'trip_4' ||
+  t.id === 'trip_5';
+
+const isMockFuel = (f: FuelLog) =>
+  f.vehicleId === 'veh_honda_city' ||
+  f.vehicleId === 'veh_toyota_corolla' ||
+  f.id === 'fuel_1' ||
+  f.id === 'fuel_2' ||
+  f.id === 'fuel_3';
+
+const isMockMaint = (m: MaintenanceItem) =>
+  m.vehicleId === 'veh_honda_city' ||
+  m.vehicleId === 'veh_toyota_corolla' ||
+  m.id === 'maint_1' ||
+  m.id === 'maint_2' ||
+  m.id === 'maint_3' ||
+  m.id === 'maint_4';
+
+const isMockLoc = (l: SavedLocation) =>
+  l.id === 'loc_home' || l.id === 'loc_office' || l.id === 'loc_parents';
+
+// Zeroing check on initial script load: Ensure application starts with a completely empty database
+// (zero pre-populated vehicles, trips, or logs) on first load.
+const ZEROED_STORAGE_KEY = 'smarttrip_db_zeroed_v2';
+
+if (typeof window !== 'undefined') {
+  try {
+    const isZeroed = localStorage.getItem(ZEROED_STORAGE_KEY);
+    if (!isZeroed) {
+      // Clear out any old pre-populated demo records
+      localStorage.removeItem(STORAGE_KEYS.VEHICLES);
+      localStorage.removeItem(STORAGE_KEYS.TRIPS);
+      localStorage.removeItem(STORAGE_KEYS.FUEL_LOGS);
+      localStorage.removeItem(STORAGE_KEYS.MAINTENANCE);
+      localStorage.removeItem(STORAGE_KEYS.SAVED_LOCATIONS);
+      localStorage.setItem(ZEROED_STORAGE_KEY, 'true');
+    }
+  } catch {
+    // restricted storage environment safeguard
+  }
+}
+
+function cleanInitialArray<T>(storageKey: string, filterMock: (item: T) => boolean): T[] {
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (!saved) return [];
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return [];
+    const cleaned = parsed.filter((item: T) => !filterMock(item));
+    if (cleaned.length !== parsed.length) {
+      localStorage.setItem(storageKey, JSON.stringify(cleaned));
+    }
+    return cleaned;
+  } catch {
+    return [];
+  }
+}
+
 export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Persistent stores
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.VEHICLES);
-      return saved ? JSON.parse(saved) : INITIAL_VEHICLES;
-    } catch {
-      return INITIAL_VEHICLES;
-    }
-  });
+  // Persistent stores: Zero initial state on first load (empty database)
+  const [vehicles, setVehicles] = useState<Vehicle[]>(() =>
+    cleanInitialArray<Vehicle>(STORAGE_KEYS.VEHICLES, isMockVehicle)
+  );
 
-  const [trips, setTrips] = useState<Trip[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.TRIPS);
-      return saved ? JSON.parse(saved) : INITIAL_TRIPS;
-    } catch {
-      return INITIAL_TRIPS;
-    }
-  });
+  const [trips, setTrips] = useState<Trip[]>(() =>
+    cleanInitialArray<Trip>(STORAGE_KEYS.TRIPS, isMockTrip)
+  );
 
-  const [fuelLogs, setFuelLogs] = useState<FuelLog[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.FUEL_LOGS);
-      return saved ? JSON.parse(saved) : INITIAL_FUEL_LOGS;
-    } catch {
-      return INITIAL_FUEL_LOGS;
-    }
-  });
+  const [fuelLogs, setFuelLogs] = useState<FuelLog[]>(() =>
+    cleanInitialArray<FuelLog>(STORAGE_KEYS.FUEL_LOGS, isMockFuel)
+  );
 
-  const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.MAINTENANCE);
-      return saved ? JSON.parse(saved) : INITIAL_MAINTENANCE;
-    } catch {
-      return INITIAL_MAINTENANCE;
-    }
-  });
+  const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>(() =>
+    cleanInitialArray<MaintenanceItem>(STORAGE_KEYS.MAINTENANCE, isMockMaint)
+  );
 
-  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.SAVED_LOCATIONS);
-      return saved ? JSON.parse(saved) : INITIAL_SAVED_LOCATIONS;
-    } catch {
-      return INITIAL_SAVED_LOCATIONS;
-    }
-  });
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(() =>
+    cleanInitialArray<SavedLocation>(STORAGE_KEYS.SAVED_LOCATIONS, isMockLoc)
+  );
 
   const [settings, setSettings] = useState<UserSettings>(() => {
     try {
@@ -156,7 +211,7 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   // UI state
-  const [activeTab, setActiveTab] = useState<'home' | 'trips' | 'fuel' | 'vehicle' | 'more'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'trips' | 'maps' | 'fuel' | 'vehicle' | 'more'>('home');
   const [showOnboarding, setShowOnboarding] = useState<boolean>(!settings.completedOnboarding);
   const [showLocationPermissionModal, setShowLocationPermissionModal] = useState<boolean>(false);
   const [showAddFuelModal, setShowAddFuelModal] = useState<boolean>(false);
@@ -169,6 +224,7 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isTripActive, setIsTripActive] = useState<boolean>(false);
   const [isTripPaused, setIsTripPaused] = useState<boolean>(false);
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState<number>(0);
+  const [maxSpeedKmh, setMaxSpeedKmh] = useState<number>(0);
   const [currentDistanceKm, setCurrentDistanceKm] = useState<number>(0);
   const [currentDurationSeconds, setCurrentDurationSeconds] = useState<number>(0);
   const [currentMovingSeconds, setCurrentMovingSeconds] = useState<number>(0);
@@ -178,8 +234,8 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [gpsSignal, setGpsSignal] = useState<'strong' | 'moderate' | 'weak' | 'searching' | 'simulated'>('searching');
   const [pendingSummaryTrip, setPendingSummaryTrip] = useState<Trip | null>(null);
 
-  // Active Vehicle
-  const activeVehicle = vehicles.find((v) => v.isDefault) || vehicles[0] || INITIAL_VEHICLES[0];
+  // Active Vehicle (nullable when garage is empty)
+  const activeVehicle = vehicles.find((v) => v.isDefault) || vehicles[0] || null;
 
   // Geolocation watch ID ref
   const watchIdRef = useRef<number | null>(null);
@@ -188,32 +244,158 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const lastPositionRef = useRef<TripPoint | null>(null);
   const tripStartTimeRef = useRef<number>(0);
   const tripCategoryRef = useRef<TripCategory>('Commute');
-  const activeVehicleIdRef = useRef<string>(activeVehicle.id);
+  const activeVehicleIdRef = useRef<string>(activeVehicle?.id || '');
+  const [isIndexedDBLoaded, setIsIndexedDBLoaded] = useState<boolean>(false);
 
-  // Sync to local storage
+  // Hydrate local data from IndexedDB on initial mount
+  useEffect(() => {
+    let isMounted = true;
+
+    async function hydrateFromIndexedDB() {
+      try {
+        // First load zeroing check for IndexedDB
+        const isIdbZeroed = await idbGet<string>(ZEROED_STORAGE_KEY);
+        if (!isIdbZeroed) {
+          await Promise.all([
+            idbSet(IDB_KEYS.VEHICLES, []),
+            idbSet(IDB_KEYS.TRIPS, []),
+            idbSet(IDB_KEYS.FUEL_LOGS, []),
+            idbSet(IDB_KEYS.MAINTENANCE, []),
+            idbSet(IDB_KEYS.SAVED_LOCATIONS, []),
+            idbSet(ZEROED_STORAGE_KEY, 'true'),
+          ]);
+          if (isMounted) {
+            setVehicles([]);
+            setTrips([]);
+            setFuelLogs([]);
+            setMaintenanceItems([]);
+            setSavedLocations([]);
+            setIsIndexedDBLoaded(true);
+          }
+          return;
+        }
+
+        const [
+          savedVehicles,
+          savedTrips,
+          savedFuelLogs,
+          savedMaintenance,
+          savedLocs,
+          savedSettings,
+        ] = await Promise.all([
+          idbGet<Vehicle[]>(IDB_KEYS.VEHICLES),
+          idbGet<Trip[]>(IDB_KEYS.TRIPS),
+          idbGet<FuelLog[]>(IDB_KEYS.FUEL_LOGS),
+          idbGet<MaintenanceItem[]>(IDB_KEYS.MAINTENANCE),
+          idbGet<SavedLocation[]>(IDB_KEYS.SAVED_LOCATIONS),
+          idbGet<UserSettings>(IDB_KEYS.SETTINGS),
+        ]);
+
+        if (!isMounted) return;
+
+        if (savedVehicles && Array.isArray(savedVehicles)) {
+          const cleaned = savedVehicles.filter((v) => !isMockVehicle(v));
+          setVehicles(cleaned);
+          idbSet(IDB_KEYS.VEHICLES, cleaned);
+        } else {
+          idbSet(IDB_KEYS.VEHICLES, vehicles);
+        }
+
+        if (savedTrips && Array.isArray(savedTrips)) {
+          const cleaned = savedTrips.filter((t) => !isMockTrip(t));
+          setTrips(cleaned);
+          idbSet(IDB_KEYS.TRIPS, cleaned);
+        } else {
+          idbSet(IDB_KEYS.TRIPS, trips);
+        }
+
+        if (savedFuelLogs && Array.isArray(savedFuelLogs)) {
+          const cleaned = savedFuelLogs.filter((f) => !isMockFuel(f));
+          setFuelLogs(cleaned);
+          idbSet(IDB_KEYS.FUEL_LOGS, cleaned);
+        } else {
+          idbSet(IDB_KEYS.FUEL_LOGS, fuelLogs);
+        }
+
+        if (savedMaintenance && Array.isArray(savedMaintenance)) {
+          const cleaned = savedMaintenance.filter((m) => !isMockMaint(m));
+          setMaintenanceItems(cleaned);
+          idbSet(IDB_KEYS.MAINTENANCE, cleaned);
+        } else {
+          idbSet(IDB_KEYS.MAINTENANCE, maintenanceItems);
+        }
+
+        if (savedLocs && Array.isArray(savedLocs)) {
+          const cleaned = savedLocs.filter((l) => !isMockLoc(l));
+          setSavedLocations(cleaned);
+          idbSet(IDB_KEYS.SAVED_LOCATIONS, cleaned);
+        } else {
+          idbSet(IDB_KEYS.SAVED_LOCATIONS, savedLocations);
+        }
+
+        if (savedSettings && typeof savedSettings === 'object') {
+          setSettings(savedSettings);
+        } else {
+          idbSet(IDB_KEYS.SETTINGS, settings);
+        }
+      } catch (err) {
+        console.warn('[TripProvider] Error hydrating from IndexedDB:', err);
+      } finally {
+        if (isMounted) {
+          setIsIndexedDBLoaded(true);
+        }
+      }
+    }
+
+    hydrateFromIndexedDB();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Sync to local storage & IndexedDB
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify(vehicles));
-  }, [vehicles]);
+    if (isIndexedDBLoaded) {
+      idbSet(IDB_KEYS.VEHICLES, vehicles);
+    }
+  }, [vehicles, isIndexedDBLoaded]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.TRIPS, JSON.stringify(trips));
-  }, [trips]);
+    if (isIndexedDBLoaded) {
+      idbSet(IDB_KEYS.TRIPS, trips);
+    }
+  }, [trips, isIndexedDBLoaded]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.FUEL_LOGS, JSON.stringify(fuelLogs));
-  }, [fuelLogs]);
+    if (isIndexedDBLoaded) {
+      idbSet(IDB_KEYS.FUEL_LOGS, fuelLogs);
+    }
+  }, [fuelLogs, isIndexedDBLoaded]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.MAINTENANCE, JSON.stringify(maintenanceItems));
-  }, [maintenanceItems]);
+    if (isIndexedDBLoaded) {
+      idbSet(IDB_KEYS.MAINTENANCE, maintenanceItems);
+    }
+  }, [maintenanceItems, isIndexedDBLoaded]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SAVED_LOCATIONS, JSON.stringify(savedLocations));
-  }, [savedLocations]);
+    if (isIndexedDBLoaded) {
+      idbSet(IDB_KEYS.SAVED_LOCATIONS, savedLocations);
+    }
+  }, [savedLocations, isIndexedDBLoaded]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-  }, [settings]);
+    if (isIndexedDBLoaded) {
+      idbSet(IDB_KEYS.SETTINGS, settings);
+    }
+  }, [settings, isIndexedDBLoaded]);
 
   // Dark Mode Theme synchronization
   useEffect(() => {
@@ -247,14 +429,15 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Keep activeVehicleIdRef synced
   useEffect(() => {
-    activeVehicleIdRef.current = activeVehicle.id;
-  }, [activeVehicle.id]);
+    activeVehicleIdRef.current = activeVehicle ? activeVehicle.id : '';
+  }, [activeVehicle?.id]);
 
-  // Live Timer during Active Trip
+  // Live Timer during Active Trip (wall-clock synchronized so screen-off doesn't lose seconds)
   useEffect(() => {
     if (isTripActive && !isTripPaused) {
-      timerIntervalRef.current = window.setInterval(() => {
-        setCurrentDurationSeconds((prev) => prev + 1);
+      const syncInterval = window.setInterval(() => {
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - tripStartTimeRef.current) / 1000));
+        setCurrentDurationSeconds(elapsedSec);
 
         // Track moving vs stopped based on current speed (> 2.5 km/h)
         if (currentSpeedKmh >= 2.5) {
@@ -263,6 +446,7 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCurrentStoppedSeconds((prev) => prev + 1);
         }
       }, 1000);
+      timerIntervalRef.current = syncInterval;
     } else {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
@@ -279,7 +463,21 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Cleanup on unmount
   useEffect(() => {
+    // Handle tab/screen visibility changes to re-acquire wake lock if released
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isTripActive && !isTripPaused) {
+        backgroundLocationKeeper.requestWakeLock();
+        // Immediately sync duration from wall-clock
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - tripStartTimeRef.current) / 1000));
+        setCurrentDurationSeconds(elapsedSec);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      backgroundLocationKeeper.stopKeepAlive();
       if (watchIdRef.current !== null) {
         navigator.geolocation?.clearWatch(watchIdRef.current);
       }
@@ -290,7 +488,7 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, []);
+  }, [isTripActive, isTripPaused]);
 
   // Real GPS Geolocation Watcher
   const startGpsTracking = () => {
@@ -311,7 +509,9 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (position) => {
         const { latitude, longitude, speed, heading, accuracy, altitude } = position.coords;
         const now = Date.now();
-        const speedKmh = speed !== null && speed >= 0 ? speed * 3.6 : 0;
+        // If device is stationary or GPS speed jitter is below 2.5 km/h, treat as 0
+        const rawSpeedKmh = speed !== null && speed >= 0 ? speed * 3.6 : 0;
+        const speedKmh = rawSpeedKmh < 2.5 ? 0 : rawSpeedKmh;
 
         // Evaluate signal quality
         if (accuracy < 15) {
@@ -331,7 +531,9 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
           altitude: altitude || undefined,
         };
 
-        setCurrentSpeedKmh(Math.round(speedKmh));
+        const roundedSpeed = Math.round(speedKmh);
+        setCurrentSpeedKmh(roundedSpeed);
+        setMaxSpeedKmh((prev) => Math.max(prev, roundedSpeed));
 
         if (lastPositionRef.current) {
           const deltaKm = calculateHaversineDistanceKm(
@@ -340,8 +542,8 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
             latitude,
             longitude
           );
-          // Ignore unrealistic GPS teleport jumps (> 150 km/h or < 2 meters noise)
-          if (deltaKm > 0.002 && deltaKm < 0.5) {
+          // Only accumulate distance if actually moving (speed > 2 km/h and distance > 10m to filter GPS drift)
+          if (speedKmh > 2 && deltaKm > 0.010 && deltaKm < 0.5) {
             setCurrentDistanceKm((prev) => Math.round((prev + deltaKm) * 100) / 100);
             setCurrentPoints((prev) => [...prev, newPoint]);
             lastPositionRef.current = newPoint;
@@ -432,6 +634,7 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Reset counters
     setCurrentDistanceKm(0);
     setCurrentSpeedKmh(0);
+    setMaxSpeedKmh(0);
     setCurrentDurationSeconds(0);
     setCurrentMovingSeconds(0);
     setCurrentStoppedSeconds(0);
@@ -452,18 +655,26 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsSimulation(false);
       startGpsTracking();
     }
+
+    // Keep location tracking alive when screen is locked or off
+    backgroundLocationKeeper.startKeepAlive();
   };
 
   const pauseTrip = () => {
     setIsTripPaused(true);
     setCurrentSpeedKmh(0);
+    backgroundLocationKeeper.releaseWakeLock();
   };
 
   const resumeTrip = () => {
     setIsTripPaused(false);
+    backgroundLocationKeeper.requestWakeLock();
   };
 
   const endTrip = () => {
+    // Release background audio keep alive and screen wake lock
+    backgroundLocationKeeper.stopKeepAlive();
+
     // Stop watchers
     if (watchIdRef.current !== null) {
       navigator.geolocation?.clearWatch(watchIdRef.current);
@@ -726,21 +937,27 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = JSON.parse(jsonString);
       if (data.vehicles && Array.isArray(data.vehicles)) {
         setVehicles(data.vehicles);
+        idbSet(IDB_KEYS.VEHICLES, data.vehicles);
       }
       if (data.trips && Array.isArray(data.trips)) {
         setTrips(data.trips);
+        idbSet(IDB_KEYS.TRIPS, data.trips);
       }
       if (data.fuelLogs && Array.isArray(data.fuelLogs)) {
         setFuelLogs(data.fuelLogs);
+        idbSet(IDB_KEYS.FUEL_LOGS, data.fuelLogs);
       }
       if (data.maintenanceItems && Array.isArray(data.maintenanceItems)) {
         setMaintenanceItems(data.maintenanceItems);
+        idbSet(IDB_KEYS.MAINTENANCE, data.maintenanceItems);
       }
       if (data.savedLocations && Array.isArray(data.savedLocations)) {
         setSavedLocations(data.savedLocations);
+        idbSet(IDB_KEYS.SAVED_LOCATIONS, data.savedLocations);
       }
       if (data.settings) {
         setSettings(data.settings);
+        idbSet(IDB_KEYS.SETTINGS, data.settings);
       }
       return true;
     } catch {
@@ -749,12 +966,41 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetToDefaults = () => {
-    setVehicles(INITIAL_VEHICLES);
-    setTrips(INITIAL_TRIPS);
-    setFuelLogs(INITIAL_FUEL_LOGS);
-    setMaintenanceItems(INITIAL_MAINTENANCE);
-    setSavedLocations(INITIAL_SAVED_LOCATIONS);
+    setVehicles([]);
+    setTrips([]);
+    setFuelLogs([]);
+    setMaintenanceItems([]);
+    setSavedLocations([]);
     setSettings(INITIAL_SETTINGS);
+    idbSet(IDB_KEYS.VEHICLES, []);
+    idbSet(IDB_KEYS.TRIPS, []);
+    idbSet(IDB_KEYS.FUEL_LOGS, []);
+    idbSet(IDB_KEYS.MAINTENANCE, []);
+    idbSet(IDB_KEYS.SAVED_LOCATIONS, []);
+    idbSet(IDB_KEYS.SETTINGS, INITIAL_SETTINGS);
+    localStorage.removeItem(STORAGE_KEYS.VEHICLES);
+    localStorage.removeItem(STORAGE_KEYS.TRIPS);
+    localStorage.removeItem(STORAGE_KEYS.FUEL_LOGS);
+    localStorage.removeItem(STORAGE_KEYS.MAINTENANCE);
+    localStorage.removeItem(STORAGE_KEYS.SAVED_LOCATIONS);
+  };
+
+  const clearAllData = () => {
+    setVehicles([]);
+    setTrips([]);
+    setFuelLogs([]);
+    setMaintenanceItems([]);
+    setSavedLocations([]);
+    localStorage.removeItem(STORAGE_KEYS.VEHICLES);
+    localStorage.removeItem(STORAGE_KEYS.TRIPS);
+    localStorage.removeItem(STORAGE_KEYS.FUEL_LOGS);
+    localStorage.removeItem(STORAGE_KEYS.MAINTENANCE);
+    localStorage.removeItem(STORAGE_KEYS.SAVED_LOCATIONS);
+    idbSet(IDB_KEYS.VEHICLES, []);
+    idbSet(IDB_KEYS.TRIPS, []);
+    idbSet(IDB_KEYS.FUEL_LOGS, []);
+    idbSet(IDB_KEYS.MAINTENANCE, []);
+    idbSet(IDB_KEYS.SAVED_LOCATIONS, []);
   };
 
   return (
@@ -771,6 +1017,7 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isTripActive,
         isTripPaused,
         currentSpeedKmh,
+        maxSpeedKmh,
         currentDistanceKm,
         currentDurationSeconds,
         currentMovingSeconds,
@@ -820,6 +1067,7 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
         exportData,
         importData,
         resetToDefaults,
+        clearAllData,
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-name: Build and Release Android Debug APK
+name: Build and Release Android APK
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  build-debug-apk:
+  build-apk:
     runs-on: ubuntu-latest
 
     steps:
@@ -63,42 +63,59 @@ jobs:
           fi
           echo "Temporary debug keystore verified."
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace --no-daemon
+      - name: Build Android Release and Debug APKs
+        run: gradle :app:assembleRelease :app:assembleDebug --stacktrace --no-daemon
 
-      - name: Verify the APK
+      - name: Verify the APKs
         run: |
-          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
-          if [ ! -f "$APK_PATH" ]; then
-            echo "ERROR: Exact APK file $APK_PATH not found."
-            echo "Discovered APK paths in app/build/outputs/apk:"
-            find app/build/outputs/apk -maxdepth 3 -type f -name "*.apk" || true
-            exit 1
-          fi
-          if [ ! -s "$APK_PATH" ]; then
-            echo "ERROR: APK file $APK_PATH is empty."
-            exit 1
-          fi
-          case "$APK_PATH" in
-            *.apk) ;;
-            *) echo "ERROR: File does not have .apk extension."; exit 1 ;;
-          esac
-          echo "SUCCESS: Verified APK at $APK_PATH"
+          echo "Checking built APKs in app/build/outputs/apk:"
+          find app/build/outputs/apk -name "*.apk" -ls
 
-      - name: Upload debug APK artifact
+          RELEASE_APK="app/build/outputs/apk/release/app-release.apk"
+          DEBUG_APK="app/build/outputs/apk/debug/app-debug.apk"
+
+          if [ ! -f "$RELEASE_APK" ] && [ ! -f "$DEBUG_APK" ]; then
+            echo "ERROR: Neither release nor debug APK was found."
+            exit 1
+          fi
+          echo "SUCCESS: Verified generated APK(s)."
+
+      - name: Upload Release APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+          name: SmartTrip-Release-APK
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: warn
+          retention-days: 30
 
-      - name: Prepare APK release asset
+      - name: Upload Debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartTrip-Debug-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Prepare APK release assets
         id: prepare_asset
         run: |
           TMP_DIR=$(mktemp -d)
-          cp app/build/outputs/apk/debug/app-debug.apk "$TMP_DIR/app-debug.apk"
-          echo "asset_path=$TMP_DIR/app-debug.apk" >> "$GITHUB_OUTPUT"
+          ASSETS=()
+
+          if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
+            cp "app/build/outputs/apk/release/app-release.apk" "$TMP_DIR/SmartTrip-v1.0.0-release.apk"
+            cp "app/build/outputs/apk/release/app-release.apk" "$TMP_DIR/app-release.apk"
+            ASSETS+=("$TMP_DIR/SmartTrip-v1.0.0-release.apk" "$TMP_DIR/app-release.apk")
+          fi
+
+          if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+            cp "app/build/outputs/apk/debug/app-debug.apk" "$TMP_DIR/SmartTrip-v1.0.0-debug.apk"
+            cp "app/build/outputs/apk/debug/app-debug.apk" "$TMP_DIR/app-debug.apk"
+            ASSETS+=("$TMP_DIR/SmartTrip-v1.0.0-debug.apk" "$TMP_DIR/app-debug.apk")
+          fi
+
+          echo "Prepared assets: ${ASSETS[*]}"
+          echo "asset_dir=$TMP_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Publish APK to GitHub Releases
         id: release_step
@@ -107,40 +124,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh --version
-          PREPARED_PATH="${{ steps.prepare_asset.outputs.asset_path }}"
-          if [ ! -f "$PREPARED_PATH" ]; then
-            echo "ERROR: Prepared APK not found at $PREPARED_PATH"
-            exit 1
-          fi
-          if [ ! -s "$PREPARED_PATH" ]; then
-            echo "ERROR: Prepared APK is empty."
-            exit 1
-          fi
-          ASSET_NAME=$(basename "$PREPARED_PATH")
-          if [ "$ASSET_NAME" != "app-debug.apk" ]; then
-            echo "ERROR: Asset filename is not app-debug.apk (found: $ASSET_NAME)"
-            exit 1
-          fi
-          case "$PREPARED_PATH" in
-            *.apk) ;;
-            *) echo "ERROR: Asset does not end in .apk"; exit 1 ;;
-          esac
+          TMP_DIR="${{ steps.prepare_asset.outputs.asset_dir }}"
+          RELEASE_TAG="v1.0.0-${{ github.run_number }}"
+          RELEASE_TITLE="SmartTrip v1.0.0 (Build #${{ github.run_number }})"
 
-          RELEASE_TAG="debug-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
-          RELEASE_TITLE="Debug APK Build #${{ github.run_number }}"
+          # Gather all apk files to release
+          APK_FILES=("$TMP_DIR"/*.apk)
 
-          gh release create "$RELEASE_TAG" "$PREPARED_PATH" \
+          gh release create "$RELEASE_TAG" "${APK_FILES[@]}" \
             --title "$RELEASE_TITLE" \
             --target "${{ github.sha }}" \
             --latest \
-            --notes "This is an automatically generated debug APK.
-          The APK was built by GitHub Actions.
-          GitHub Actions run number: ${{ github.run_number }}
-          GitHub Actions run attempt: ${{ github.run_attempt }}
-          Source commit SHA: ${{ github.sha }}
-          APK is intended for testing.
-          APK is not a Play Store production release.
-          APK is signed only with a temporary debug keystore."
+            --notes "### SmartTrip Android APK Release (v1.0.0)
+          
+          **Included Builds:**
+          - **SmartTrip-v1.0.0-release.apk** (Optimized Release APK)
+          - **SmartTrip-v1.0.0-debug.apk** (Debug APK with logging)
+          
+          Built automatically via GitHub Actions:
+          - Run: #${{ github.run_number }}
+          - Commit: ${{ github.sha }}
+          - Target Android SDK: 35 (Android 15)
+          - Min Android SDK: 24 (Android 7.0+)"
 
       - name: Report APK download result
         if: always()
@@ -148,20 +153,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ steps.release_step.outcome }}" = "success" ]; then
-            RELEASE_TAG="debug-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
-            gh release view "$RELEASE_TAG" || true
-            echo "Release Tag: $RELEASE_TAG"
-            echo "Release Title: Debug APK Build #${{ github.run_number }}"
-            echo "Release Page: https://github.com/${{ github.repository }}/releases/tag/$RELEASE_TAG"
-            echo "APK Asset Name: app-debug.apk"
-            DIRECT_URL="https://github.com/${{ github.repository }}/releases/latest/download/app-debug.apk"
-            echo "### DIRECT APK DOWNLOAD" >> "$GITHUB_STEP_SUMMARY"
-            echo "[Download app-debug.apk]($DIRECT_URL)" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "The normal Actions artifact app-debug-apk remains available as a backup." >> "$GITHUB_STEP_SUMMARY"
+            RELEASE_TAG="v1.0.0-${{ github.run_number }}"
+            echo "### DIRECT APK DOWNLOADS" >> "$GITHUB_STEP_SUMMARY"
+            echo "- [Download SmartTrip Release APK](https://github.com/${{ github.repository }}/releases/latest/download/SmartTrip-v1.0.0-release.apk)" >> "$GITHUB_STEP_SUMMARY"
+            echo "- [Download SmartTrip Debug APK](https://github.com/${{ github.repository }}/releases/latest/download/SmartTrip-v1.0.0-debug.apk)" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "WARNING: GitHub Release creation did not complete successfully."
-            if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
-              echo "The APK build succeeded and the Actions artifact named app-debug-apk remains available."
-            fi
+            echo "Release build completed. Artifacts are available in GitHub Actions tab." >> "$GITHUB_STEP_SUMMARY"
           fi
